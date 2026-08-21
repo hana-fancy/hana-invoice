@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>売上精算アプリ — ファンシーフラワー パル店</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f4f8; color: #222; min-height: 100vh; }
+
+  .header { background: #1a2e4a; color: #fff; padding: 14px 20px; font-size: 15px; font-weight: bold; text-align: center; }
+
+  .content { padding: 16px; max-width: 480px; margin: 0 auto; }
+
+  .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  .section-title { font-size: 13px; font-weight: bold; color: #1a2e4a; margin-bottom: 14px; border-left: 4px solid #1a2e4a; padding-left: 8px; }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 12px; color: #555; font-weight: bold; margin-bottom: 5px; }
+  .field input {
+    width: 100%; padding: 12px 14px; border: 1px solid #ccd; border-radius: 6px;
+    font-size: 20px; text-align: right; font-family: inherit; background: #fafbff;
+  }
+  .field input[type="date"] { text-align: left; font-size: 15px; }
+  .field input:focus { outline: none; border-color: #4a6fa5; box-shadow: 0 0 0 2px rgba(74,111,165,0.2); background: #fff; }
+  .field .hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  .total-bar {
+    background: #eef2ff; border-radius: 8px; padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
+  }
+  .total-bar .lbl { font-size: 13px; font-weight: bold; color: #1a2e4a; }
+  .total-bar .val { font-size: 24px; font-weight: bold; color: #1a2e4a; }
+
+  .btn-confirm {
+    width: 100%; padding: 16px; background: #2e7d32; color: #fff;
+    border: none; border-radius: 8px; font-size: 17px; font-weight: bold;
+    font-family: inherit; cursor: pointer; letter-spacing: 1px;
+  }
+  .btn-confirm:hover { background: #1b5e20; }
+  .btn-confirm:disabled { background: #aaa; cursor: not-allowed; }
+
+  .error-msg { background: #fce4e4; color: #c62828; border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 14px; display: none; }
+
+  /* 結果画面 */
+  .result-header { text-align: center; padding: 16px; background: #e8f5e9; border-radius: 10px; margin-bottom: 14px; }
+  .result-header .check { font-size: 40px; }
+  .result-header .msg { font-size: 15px; font-weight: bold; color: #2e7d32; margin-top: 4px; }
+  .result-header .date { font-size: 13px; color: #555; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { background: #1a2e4a; color: #fff; padding: 8px 10px; text-align: center; font-weight: bold; }
+  td { padding: 8px 10px; border: 1px solid #dde; text-align: right; }
+  td.lbl { text-align: center; font-weight: bold; font-size: 13px; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+  .row-hassuu td { background: #fffbe6 !important; color: #856404; font-weight: bold; }
+  .row-total td { background: #eef2ff !important; font-weight: bold; }
+
+  .btn-next {
+    width: 100%; padding: 14px; background: #4a6fa5; color: #fff;
+    border: none; border-radius: 8px; font-size: 15px; font-weight: bold;
+    font-family: inherit; cursor: pointer; margin-top: 14px;
+  }
+  .btn-next:hover { background: #3a5a90; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .saving-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.85);
+    align-items: center; justify-content: center;
+    font-size: 16px; font-weight: bold; color: #1a2e4a;
+    z-index: 100;
+  }
+
+  /* 履歴 */
+  .hist-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 0; border-bottom: 1px solid #eee;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-date { font-size: 13px; font-weight: bold; color: #1a2e4a; min-width: 80px; }
+  .hist-total { font-size: 14px; font-weight: bold; flex: 1; text-align: right; }
+  .hist-slip { font-size: 11px; color: #999; min-width: 54px; text-align: right; }
+  .btn-hist { padding: 5px 10px; border: none; border-radius: 5px; font-size: 12px; font-family: inherit; cursor: pointer; font-weight: bold; }
+  .btn-tenki { background: #eef2ff; color: #1a2e4a; }
+  .btn-edit2 { background: #fff3e0; color: #e65100; }
+
+  /* モーダル共通 */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45); z-index: 200;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .modal-sheet {
+    background: #fff; border-radius: 16px 16px 0 0; padding: 20px;
+    width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto;
+  }
+  .modal-sheet h3 { font-size: 15px; color: #1a2e4a; margin-bottom: 14px; }
+  .modal-field { margin-bottom: 12px; }
+  .modal-field label { display: block; font-size: 12px; color: #555; font-weight: bold; margin-bottom: 4px; }
+  .modal-field input {
+    width: 100%; padding: 10px 12px; border: 1px solid #ccd; border-radius: 6px;
+    font-size: 18px; text-align: right; font-family: inherit;
+  }
+  .modal-field input[type="date"] { text-align: left; font-size: 14px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-btns button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: bold; }
+  .btn-save2 { background: #2e7d32; color: #fff; }
+  .btn-cancel2 { background: #eee; color: #555; }
+  .modal-err { color: #c62828; font-size: 12px; margin-top: 6px; display: none; }
+
+  /* 転記モーダル内テーブル */
+  .modal-sheet table { font-size: 13px; }
+  .modal-sheet th { padding: 6px 8px; }
+  .modal-sheet td { padding: 6px 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">売上精算アプリ — ファンシーフラワー パル店</div>
+
+<div class="saving-overlay" id="saving-overlay" style="display:none">保存中...</div>
+
+<!-- ── 入力画面 ── -->
+<div class="view active" id="view-input">
+  <div class="content">
+
+    <div class="card">
+      <div class="section-title">日付・伝票番号</div>
+      <div class="field">
+        <label>売上日</label>
+        <input type="date" id="input-date">
+      </div>
+      <div class="field">
+        <label>伝票番号</label>
+        <input type="number" id="input-slip" placeholder="例: 426566" inputmode="numeric" style="font-size:18px;">
+        <div class="hint">手書き伝票の伝票番号を入力してください</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">税込売上（円）</div>
+      <div class="field">
+        <label>現金売上</label>
+        <input type="number" id="input-genkin" placeholder="0" inputmode="numeric" oninput="updateTotal()">
+      </div>
+      <div class="field">
+        <label>クレジット売上</label>
+        <input type="number" id="input-credit" placeholder="0" inputmode="numeric" oninput="updateTotal()">
+      </div>
+      <div class="field">
+        <label>QR決済（PayPay）</label>
+        <input type="number" id="input-qr" placeholder="0" inputmode="numeric" oninput="updateTotal()">
+      </div>
+      <div class="total-bar">
+        <span class="lbl">合計</span>
+        <span class="val" id="display-total">0 円</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">客数（任意）</div>
+      <div class="field">
+        <input type="number" id="input-customers" placeholder="人数を入力" inputmode="numeric">
+        <div class="hint">入力しない場合は空白でOK</div>
+      </div>
+    </div>
+
+    <div id="error-msg" class="error-msg"></div>
+
+    <button class="btn-confirm" onclick="confirmSave()">確定して保存</button>
+
+    <!-- 入力履歴 -->
+    <div class="card" style="margin-top:14px;">
+      <div class="section-title">最近の入力履歴</div>
+      <div id="hist-container"><div style="font-size:13px;color:#aaa;text-align:center;padding:10px;">読み込み中...</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 転記モーダル -->
+<div class="modal-overlay" id="modal-tenki" style="display:none" onclick="if(event.target===this)closeTenki()">
+  <div class="modal-sheet">
+    <h3 id="tenki-date-label"></h3>
+    <div class="card" style="margin-bottom:10px;">
+      <div class="section-title">本日合計（税込）</div>
+      <table>
+        <thead><tr><th>現金</th><th>クレジット</th><th>QR</th><th>合計</th></tr></thead>
+        <tbody id="tenki-summary"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="section-title">転記用セクション</div>
+      <table>
+        <thead><tr><th>支払区分</th><th>原単価</th><th>売単価</th><th>税込</th></tr></thead>
+        <tbody id="tenki-rows"></tbody>
+      </table>
+    </div>
+    <button class="btn-next" style="margin-top:10px;" onclick="closeTenki()">閉じる</button>
+  </div>
+</div>
+
+<!-- 修正モーダル -->
+<div class="modal-overlay" id="modal-edit" style="display:none" onclick="if(event.target===this)closeEdit()">
+  <div class="modal-sheet">
+    <h3>入力内容を修正</h3>
+    <div style="font-size:12px;color:#888;background:#f7f9fc;padding:8px 12px;border-radius:6px;margin-bottom:12px;" id="edit-original"></div>
+    <div class="modal-field">
+      <label>売上日</label>
+      <input type="date" id="edit-date">
+    </div>
+    <div class="modal-field">
+      <label>伝票番号</label>
+      <input type="number" id="edit-slip" inputmode="numeric" placeholder="空白でもOK">
+    </div>
+    <div class="modal-field">
+      <label>現金売上（円）</label>
+      <input type="number" id="edit-genkin" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="modal-field">
+      <label>クレジット売上（円）</label>
+      <input type="number" id="edit-credit" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="modal-field">
+      <label>QR決済（円）</label>
+      <input type="number" id="edit-qr" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="modal-field">
+      <label>客数</label>
+      <input type="number" id="edit-customers" inputmode="numeric" placeholder="空白でもOK">
+    </div>
+    <div class="modal-err" id="edit-err"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel2" onclick="closeEdit()">キャンセル</button>
+      <button class="btn-save2" onclick="saveEdit()">修正を保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 転記用データ表示 ── -->
+<div class="view" id="view-result">
+  <div class="content">
+
+    <div class="result-header">
+      <div class="check">✅</div>
+      <div class="msg">保存完了</div>
+      <div class="date" id="result-date"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">本日合計（税込）</div>
+      <table>
+        <thead><tr><th>現金</th><th>クレジット</th><th>QR</th><th>合計</th></tr></thead>
+        <tbody>
+          <tr>
+            <td id="r-genkin"></td>
+            <td id="r-credit"></td>
+            <td id="r-qr"></td>
+            <td id="r-total"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="section-title">転記用セクション</div>
+      <p style="font-size:11px;color:#aaa;margin-bottom:10px;">伝票への手書き転記にご利用ください</p>
+      <table>
+        <thead>
+          <tr><th>支払区分</th><th>原単価</th><th>売単価</th><th>税込</th></tr>
+        </thead>
+        <tbody id="result-tenki"></tbody>
+      </table>
+    </div>
+
+    <button class="btn-next" onclick="goToNext()">次の日の入力へ</button>
+
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+// Supabase設定
+// ──────────────────────────────────────────────
+const SUPABASE_URL = 'https://vvyzwwoduaqqamjvoqrp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2eXp3d29kdWFxcWFtanZvcXJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTk1MzMsImV4cCI6MjA5NTM5NTUzM30.aKE-ZUjXJ0j3iBMQP1GLpfwwzPWGJFglhJa0vB52Q-U';  // ← ここを差し替える
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(SUPABASE_URL + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : [];
+}
+
+// ──────────────────────────────────────────────
+// 計算ロジック（検証アプリと同一）
+// ──────────────────────────────────────────────
+function intfloor(v) { return Math.floor(v); }
+
+function costPrice(D) {
+  if (!D || D <= 0) return null;
+  const num = D * 835;
+  const q = Math.floor(num / 1000);
+  const r = num % 1000;
+  if (r > 500) return q + 1;
+  if (r < 500) return q;
+  return q % 2 === 0 ? q : q + 1;
+}
+
+function calcD(E) {
+  if (!E || E <= 0) return null;
+  const up = Math.ceil(E / 1.1);
+  return (intfloor(up * 1.1) === E) ? up : up - 1;
+}
+
+function compute(E8, E9, E10) {
+  const E11 = E8 + E9 + E10;
+  const D9 = calcD(E9), D10 = calcD(E10), D11 = calcD(E11);
+  const C9 = D9 !== null ? costPrice(D9) : null;
+  const C10 = D10 !== null ? costPrice(D10) : null;
+
+  const gH = (E8 > 0)  && (intfloor(Math.ceil(E8/1.1)*1.1)  !== E8);
+  const cH = (E9 > 0)  && (intfloor(Math.ceil(E9/1.1)*1.1)  !== E9);
+  const qH = (E10 > 0) && (intfloor(Math.ceil(E10/1.1)*1.1) !== E10);
+  const tH = D11 !== null && intfloor(D11*1.1) !== E11;
+  const tAdj = ((gH || cH || qH) && tH) ? 1 : 0;
+  const has3 = E8 > 0 && E9 > 0 && E10 > 0;
+
+  const showG = gH && !has3;
+  const showC = cH && !has3;
+  const showQ = qH && !has3;
+
+  const D31 = E11 > 0 ? D11 + tAdj : null;
+  const C31 = D31 !== null ? costPrice(D31) : null;
+
+  const C27 = E8 > 0 ? C31-(showG?1:0)-(C9||0)-(showC?1:0)-(C10||0)-(showQ?1:0) : null;
+  const D27 = E8 > 0 ? D31-(showG?1:0)-(D9||0)-(showC?1:0)-(D10||0)-(showQ?1:0) : null;
+  const E27 = E8 > 0 ? (showG ? E8-1 : E8) : null;
+  const E29 = showC ? (D9!==null?intfloor(D9*1.1):null) : (E9>0?E9:null);
+  const E30 = showQ ? (D10!==null?intfloor(D10*1.1):null) : (E10>0?E10:null);
+
+  const rows = [];
+  if (E8>0)   rows.push({cls:'',           lbl:'現金分',             c:C27, d:D27, e:E27});
+  if (showG)  rows.push({cls:'row-hassuu',  lbl:'現金（端数）',       c:1,   d:1,   e:1  });
+  if (E9>0)   rows.push({cls:'',           lbl:'クレジット支払分',   c:C9,  d:D9,  e:E29});
+  if (showC)  rows.push({cls:'row-hassuu',  lbl:'クレジット（端数）', c:1,   d:1,   e:1  });
+  if (E10>0)  rows.push({cls:'',           lbl:'PayPay支払分',       c:C10, d:D10, e:E30});
+  if (showQ)  rows.push({cls:'row-hassuu',  lbl:'QR（端数）',         c:1,   d:1,   e:1  });
+  rows.push(            {cls:'row-total',   lbl:'合計',               c:C31, d:D31, e:E11>0?E11:null});
+
+  return { rows, E11 };
+}
+
+// ──────────────────────────────────────────────
+// UIヘルパー
+// ──────────────────────────────────────────────
+function fmt(v) {
+  if (v === null || v === undefined) return '';
+  return Number(v).toLocaleString('ja-JP');
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function updateTotal() {
+  const E8  = Number(document.getElementById('input-genkin').value) || 0;
+  const E9  = Number(document.getElementById('input-credit').value) || 0;
+  const E10 = Number(document.getElementById('input-qr').value)     || 0;
+  document.getElementById('display-total').textContent = fmt(E8+E9+E10) + ' 円';
+}
+
+// ──────────────────────────────────────────────
+// 確定・保存
+// ──────────────────────────────────────────────
+async function confirmSave() {
+  showError('');
+  const payment_date   = document.getElementById('input-date').value;
+  const E8  = Number(document.getElementById('input-genkin').value)   || 0;
+  const E9  = Number(document.getElementById('input-credit').value)   || 0;
+  const E10 = Number(document.getElementById('input-qr').value)       || 0;
+  const cust = document.getElementById('input-customers').value;
+  const slip = document.getElementById('input-slip').value;
+
+  if (!payment_date)       { showError('日付を入力してください'); return; }
+  if (E8+E9+E10 === 0)     { showError('売上金額を1つ以上入力してください'); return; }
+
+  const btn = document.querySelector('.btn-confirm');
+  btn.disabled = true;
+  document.getElementById('saving-overlay').style.display = 'flex';
+
+  try {
+    await sbFetch('/rest/v1/daily_payments', {
+      method: 'POST',
+      body: JSON.stringify({
+        payment_date,
+        genkin: E8,
+        credit: E9,
+        qr: E10,
+        customer_count: cust ? Number(cust) : null,
+        slip_number: slip ? Number(slip) : null,
+        source_type: 'manual'
+      })
+    });
+    showResult(payment_date, E8, E9, E10);
+    loadHistory();
+  } catch(e) {
+    showError('保存に失敗しました: ' + e.message);
+    btn.disabled = false;
+  } finally {
+    document.getElementById('saving-overlay').style.display = 'none';
+  }
+}
+
+// ──────────────────────────────────────────────
+// 結果表示
+// ──────────────────────────────────────────────
+function showResult(payment_date, E8, E9, E10) {
+  const d = new Date(payment_date + 'T00:00:00');
+  document.getElementById('result-date').textContent =
+    d.toLocaleDateString('ja-JP', {year:'numeric', month:'long', day:'numeric', weekday:'short'});
+
+  document.getElementById('r-genkin').textContent = E8  > 0 ? fmt(E8)  + '円' : '—';
+  document.getElementById('r-credit').textContent = E9  > 0 ? fmt(E9)  + '円' : '—';
+  document.getElementById('r-qr').textContent     = E10 > 0 ? fmt(E10) + '円' : '—';
+  document.getElementById('r-total').textContent  = fmt(E8+E9+E10) + '円';
+
+  const { rows } = compute(E8, E9, E10);
+  document.getElementById('result-tenki').innerHTML = rows.map(r =>
+    `<tr class="${r.cls}">
+      <td class="lbl">${r.lbl}</td>
+      <td>${fmt(r.c)}</td>
+      <td>${fmt(r.d)}</td>
+      <td>${fmt(r.e)}</td>
+    </tr>`
+  ).join('');
+
+  showView('view-result');
+}
+
+// ──────────────────────────────────────────────
+// 次の日へ
+// ──────────────────────────────────────────────
+function goToNext() {
+  const currentDate = document.getElementById('input-date').value;
+  document.getElementById('input-genkin').value    = '';
+  document.getElementById('input-credit').value    = '';
+  document.getElementById('input-qr').value        = '';
+  document.getElementById('input-customers').value = '';
+  document.getElementById('input-slip').value      = '';
+  updateTotal();
+  showError('');
+  document.querySelector('.btn-confirm').disabled = false;
+
+  if (currentDate) {
+    const next = new Date(currentDate + 'T00:00:00');
+    next.setDate(next.getDate() + 1);
+    document.getElementById('input-date').value = next.toLocaleDateString('sv-SE');
+  }
+
+  showView('view-input');
+}
+
+// ──────────────────────────────────────────────
+// 履歴
+// ──────────────────────────────────────────────
+function getLatestRecords(rows) {
+  const map = {};
+  rows.forEach(r => {
+    if (r.is_edited) return;
+    const key = r.payment_date;
+    if (!map[key] || r.id > map[key].id) map[key] = r;
+  });
+  return Object.values(map).sort((a,b) => b.payment_date.localeCompare(a.payment_date));
+}
+
+async function loadHistory() {
+  const el = document.getElementById('hist-container');
+  try {
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(from.getDate() - 9);
+    const fromStr = from.toLocaleDateString('sv-SE');
+    const toStr   = today.toLocaleDateString('sv-SE');
+    const rows = await sbFetch(`/rest/v1/daily_payments?payment_date=gte.${fromStr}&payment_date=lte.${toStr}&order=payment_date.desc,id.desc`);
+    const latest = getLatestRecords(rows);
+    if (!latest.length) { el.innerHTML = '<div style="font-size:13px;color:#aaa;text-align:center;padding:10px;">まだ入力がありません</div>'; return; }
+    el.innerHTML = latest.map(r => {
+      const E8=r.genkin||0, E9=r.credit||0, E10=r.qr||0;
+      const total = E8+E9+E10;
+      const d = new Date(r.payment_date+'T00:00:00');
+      const dateStr = d.toLocaleDateString('ja-JP',{month:'numeric',day:'numeric',weekday:'short'});
+      return `<div class="hist-row">
+        <div class="hist-date">${dateStr}</div>
+        <div class="hist-total">${fmt(total)}円</div>
+        <div class="hist-slip">${r.slip_number ? '№'+r.slip_number : ''}</div>
+        <button class="btn-hist btn-tenki" onclick="openTenki(${r.id},${E8},${E9},${E10},'${r.payment_date}')">転記</button>
+        <button class="btn-hist btn-edit2" onclick="openEdit(${r.id},'${r.payment_date}',${E8},${E9},${E10},${r.customer_count||0},${r.slip_number||0})">修正</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="font-size:12px;color:#c62828;padding:10px;">読み込みエラー</div>`;
+  }
+}
+
+// ── 転記モーダル ──
+function openTenki(id, E8, E9, E10, dateStr) {
+  const d = new Date(dateStr+'T00:00:00');
+  document.getElementById('tenki-date-label').textContent =
+    d.toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+  document.getElementById('tenki-summary').innerHTML = `<tr>
+    <td>${E8>0?fmt(E8)+'円':'—'}</td>
+    <td>${E9>0?fmt(E9)+'円':'—'}</td>
+    <td>${E10>0?fmt(E10)+'円':'—'}</td>
+    <td><b>${fmt(E8+E9+E10)}円</b></td>
+  </tr>`;
+  const { rows } = compute(E8, E9, E10);
+  document.getElementById('tenki-rows').innerHTML = rows.map(r =>
+    `<tr class="${r.cls}">
+      <td class="lbl">${r.lbl}</td>
+      <td>${fmt(r.c)}</td><td>${fmt(r.d)}</td><td>${fmt(r.e)}</td>
+    </tr>`).join('');
+  document.getElementById('modal-tenki').style.display = 'flex';
+}
+function closeTenki() { document.getElementById('modal-tenki').style.display = 'none'; }
+
+// ── 修正モーダル ──
+let editingId = null;
+function openEdit(id, date, E8, E9, E10, customers, slip) {
+  editingId = id;
+  document.getElementById('edit-date').value     = date;
+  document.getElementById('edit-slip').value     = slip || '';
+  document.getElementById('edit-genkin').value   = E8 || '';
+  document.getElementById('edit-credit').value   = E9 || '';
+  document.getElementById('edit-qr').value       = E10 || '';
+  document.getElementById('edit-customers').value= customers || '';
+  document.getElementById('edit-err').style.display = 'none';
+  const d = new Date(date+'T00:00:00');
+  document.getElementById('edit-original').textContent =
+    `修正前: ${d.toLocaleDateString('ja-JP',{month:'long',day:'numeric'})} ／ 合計 ${fmt(E8+E9+E10)}円`;
+  document.getElementById('modal-edit').style.display = 'flex';
+}
+function closeEdit() { document.getElementById('modal-edit').style.display = 'none'; editingId = null; }
+
+async function saveEdit() {
+  const errEl = document.getElementById('edit-err');
+  errEl.style.display = 'none';
+  const payment_date = document.getElementById('edit-date').value;
+  const E8  = Number(document.getElementById('edit-genkin').value)   || 0;
+  const E9  = Number(document.getElementById('edit-credit').value)   || 0;
+  const E10 = Number(document.getElementById('edit-qr').value)       || 0;
+  const slip = document.getElementById('edit-slip').value;
+  const cust = document.getElementById('edit-customers').value;
+  if (!payment_date) { errEl.textContent='日付を入力してください'; errEl.style.display='block'; return; }
+  if (E8+E9+E10===0) { errEl.textContent='金額を入力してください'; errEl.style.display='block'; return; }
+
+  const btn = document.querySelector('#modal-edit .btn-save2');
+  btn.disabled = true;
+  document.getElementById('saving-overlay').style.display = 'flex';
+  try {
+    await sbFetch(`/rest/v1/daily_payments?id=eq.${editingId}`, {
+      method: 'PATCH', body: JSON.stringify({ is_edited: true })
+    });
+    await sbFetch('/rest/v1/daily_payments', {
+      method: 'POST',
+      body: JSON.stringify({
+        payment_date, genkin: E8, credit: E9, qr: E10,
+        slip_number: slip ? Number(slip) : null,
+        customer_count: cust ? Number(cust) : null,
+        is_correction: true, original_id: editingId, source_type: 'manual'
+      })
+    });
+    closeEdit();
+    loadHistory();
+  } catch(e) {
+    errEl.textContent = '保存に失敗しました: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    document.getElementById('saving-overlay').style.display = 'none';
+  }
+}
+
+// ──────────────────────────────────────────────
+// 初期化
+// ──────────────────────────────────────────────
+document.getElementById('input-date').value = new Date().toLocaleDateString('sv-SE');
+loadHistory();
+</script>
+</body>
+</html>
