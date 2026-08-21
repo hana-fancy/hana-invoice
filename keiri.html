@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>経理管理 — ファンシーフラワー パル店</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Meiryo', 'Yu Gothic', sans-serif; background: #f0f4f8; color: #222; min-height: 100vh; }
+
+  .header { background: #1a2e4a; color: #fff; padding: 14px 20px; font-size: 15px; font-weight: bold; text-align: center; }
+  .header a { color: #aac4e8; font-size: 12px; float: right; text-decoration: none; margin-top: 2px; }
+
+  .content { padding: 16px; max-width: 900px; margin: 0 auto; }
+
+  .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+  .section-title { font-size: 13px; font-weight: bold; color: #1a2e4a; margin-bottom: 14px; border-left: 4px solid #1a2e4a; padding-left: 8px; }
+
+  /* タブ */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .tab {
+    padding: 9px 18px; border: none; border-radius: 6px;
+    font-size: 14px; font-family: inherit; cursor: pointer; font-weight: bold;
+    background: #dde5f0; color: #555;
+  }
+  .tab.active { background: #1a2e4a; color: #fff; }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* 締め期間セレクタ */
+  .period-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .period-bar select, .period-bar input {
+    padding: 7px 10px; border: 1px solid #ccd; border-radius: 5px;
+    font-size: 14px; font-family: inherit;
+  }
+  .btn-load {
+    padding: 8px 16px; background: #4a6fa5; color: #fff;
+    border: none; border-radius: 5px; font-size: 14px; font-family: inherit;
+    cursor: pointer; font-weight: bold;
+  }
+  .btn-load:hover { background: #3a5a90; }
+
+  /* 集計サマリー */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px;
+  }
+  .summary-box { background: #f0f4f8; border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .summary-box .s-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+  .summary-box .s-value { font-size: 20px; font-weight: bold; color: #1a2e4a; }
+  .summary-box .s-sub   { font-size: 11px; color: #888; margin-top: 2px; }
+  .summary-box.highlight { background: #eef2ff; }
+  .summary-box.highlight .s-value { color: #2e4a8a; }
+
+  /* テーブル */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #1a2e4a; color: #fff; padding: 8px 10px; text-align: center; white-space: nowrap; }
+  td { padding: 7px 10px; border: 1px solid #dde; text-align: right; white-space: nowrap; }
+  td.c { text-align: center; }
+  td.l { text-align: left; }
+  tr:hover td { background: #f0f4f8 !important; }
+  .row-edited td { color: #888; font-style: italic; }
+
+  .badge {
+    display: inline-block; font-size: 10px; padding: 2px 6px;
+    border-radius: 10px; font-weight: bold; vertical-align: middle;
+  }
+  .badge-edited { background: #fff3e0; color: #e65100; }
+  .badge-correction { background: #e8f5e9; color: #2e7d32; }
+
+  /* ローディング */
+  .loading { text-align: center; padding: 30px; color: #888; font-size: 14px; }
+
+  .empty { text-align: center; padding: 30px; color: #aaa; font-size: 13px; }
+
+  /* 締め期間ラベル */
+  .period-label {
+    font-size: 14px; font-weight: bold; color: #1a2e4a;
+    background: #eef2ff; border-radius: 6px; padding: 8px 14px;
+    margin-bottom: 14px; display: inline-block;
+  }
+
+  .btn-small {
+    padding: 4px 10px; border: none; border-radius: 4px;
+    font-size: 12px; font-family: inherit; cursor: pointer; font-weight: bold;
+  }
+  .btn-edit { background: #fff3e0; color: #e65100; }
+  .btn-edit:hover { background: #ffe0b2; }
+
+  /* 請求書印刷スタイル */
+  .invoice-wrap { background: #fff; padding: 32px; max-width: 760px; margin: 0 auto; box-shadow: 0 1px 4px rgba(0,0,0,0.1); border-radius: 8px; }
+  .inv-title { text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 8px; margin-bottom: 20px; }
+  .inv-meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px; }
+  .inv-meta .left { line-height: 1.8; }
+  .inv-meta .right { line-height: 1.8; text-align: right; }
+  .inv-tenant { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+  .inv-period { font-size: 13px; color: #444; margin-bottom: 16px; }
+  .inv-amount-box { border: 2px solid #1a2e4a; border-radius: 6px; padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
+  .inv-amount-box .lbl { font-size: 14px; font-weight: bold; color: #1a2e4a; }
+  .inv-amount-box .val { font-size: 26px; font-weight: bold; color: #1a2e4a; }
+  .inv-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+  .inv-table th { background: #1a2e4a; color: #fff; padding: 6px 8px; text-align: center; }
+  .inv-table td { padding: 5px 8px; border: 1px solid #ccc; text-align: right; }
+  .inv-table td.c { text-align: center; }
+  .inv-table td.l { text-align: left; }
+  .inv-table tr.subtotal td { background: #f0f4f8; font-weight: bold; }
+  .inv-table tr.total-row td { background: #1a2e4a; color: #fff; font-weight: bold; font-size: 13px; }
+  .inv-cashless { margin-top: 16px; border-top: 1px solid #ccc; padding-top: 12px; font-size: 12px; }
+  .inv-cashless table { width: 260px; border-collapse: collapse; }
+  .inv-cashless td { padding: 4px 8px; border: 1px solid #ccc; }
+  .inv-cashless td.r { text-align: right; font-weight: bold; }
+  .btn-print { padding: 10px 24px; background: #1a2e4a; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: bold; margin-bottom: 16px; }
+  .btn-print:hover { background: #0f1e30; }
+
+  @media print {
+    body { background: #fff; }
+    .header,
+    .tabs,
+    #tab-list,
+    #tab-shime,
+    .section-title,
+    #invoice-controls,
+    #invoice-controls-top { display: none !important; }
+    .card { box-shadow: none !important; padding: 0 !important; }
+    .content { padding: 0; max-width: 100%; }
+    .invoice-wrap { box-shadow: none; padding: 16px; }
+    .inv-cashless { page-break-inside: avoid; }
+    .inv-table tr { page-break-inside: avoid; }
+  }
+
+  /* モーダル */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: #fff; border-radius: 12px; padding: 24px;
+    width: 90%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  }
+  .modal h3 { font-size: 15px; color: #1a2e4a; margin-bottom: 16px; }
+  .modal .field { margin-bottom: 12px; }
+  .modal .field label { display: block; font-size: 12px; color: #555; font-weight: bold; margin-bottom: 4px; }
+  .modal .field input {
+    width: 100%; padding: 9px 12px; border: 1px solid #ccd; border-radius: 5px;
+    font-size: 16px; text-align: right; font-family: inherit;
+  }
+  .modal .field input[type="date"] { text-align: left; font-size: 14px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .btn-save-edit { flex: 1; padding: 10px; background: #2e7d32; color: #fff; border: none; border-radius: 6px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: bold; }
+  .btn-cancel { flex: 1; padding: 10px; background: #eee; color: #555; border: none; border-radius: 6px; font-size: 14px; font-family: inherit; cursor: pointer; font-weight: bold; }
+  .modal .error { color: #c62828; font-size: 12px; margin-top: 6px; display: none; }
+  .original-values { background: #f7f9fc; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #666; margin-bottom: 12px; }
+  .original-values span { font-weight: bold; color: #333; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  経理管理 — ファンシーフラワー パル店
+  <a href="index.html">← 入力画面へ</a>
+</div>
+
+<!-- モーダル（修正用） -->
+<div class="modal-overlay" id="modal" style="display:none">
+  <div class="modal">
+    <h3>データ修正</h3>
+    <div class="original-values" id="modal-original"></div>
+    <div class="field">
+      <label>日付</label>
+      <input type="date" id="modal-date">
+    </div>
+    <div class="field">
+      <label>現金売上（円）</label>
+      <input type="number" id="modal-genkin" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>クレジット売上（円）</label>
+      <input type="number" id="modal-credit" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>QR決済（円）</label>
+      <input type="number" id="modal-qr" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label>伝票番号</label>
+      <input type="number" id="modal-slip" inputmode="numeric" placeholder="空白でもOK">
+    </div>
+    <div class="field">
+      <label>客数</label>
+      <input type="number" id="modal-customers" inputmode="numeric" placeholder="空白でもOK">
+    </div>
+    <div class="error" id="modal-error"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-save-edit" onclick="saveEdit()">修正を保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('tab-list')">📋 一覧</button>
+    <button class="tab" onclick="switchTab('tab-shime')">📊 締め集計</button>
+    <button class="tab" onclick="switchTab('tab-invoice')">🖨 請求書</button>
+  </div>
+
+  <!-- ── 一覧タブ ── -->
+  <div class="view active" id="tab-list">
+
+    <div class="card">
+      <div class="section-title">期間絞り込み</div>
+      <div class="period-bar">
+        <input type="month" id="list-month">
+        <button class="btn-load" onclick="loadList()">表示</button>
+        <button class="btn-load" style="background:#666" onclick="loadListAll()">全件</button>
+      </div>
+      <div id="list-container"><div class="empty">月を選択して「表示」を押してください</div></div>
+    </div>
+
+  </div>
+
+  <!-- ── 締め集計タブ ── -->
+  <div class="view" id="tab-shime">
+
+    <div class="card">
+      <div class="section-title">締め期間選択</div>
+      <div class="period-bar">
+        <select id="shime-type">
+          <option value="10">10日締め（1日〜10日）</option>
+          <option value="20">20日締め（11日〜20日）</option>
+          <option value="31">月末締め（21日〜月末）</option>
+        </select>
+        <select id="shime-year"></select>
+        <select id="shime-month"></select>
+        <button class="btn-load" onclick="loadShime()">集計</button>
+      </div>
+      <div id="shime-period-label"></div>
+      <div id="shime-container"><div class="empty">締め区分と年月を選択してください</div></div>
+    </div>
+
+  </div>
+
+  <!-- ── 請求書タブ ── -->
+  <div class="view" id="tab-invoice">
+
+    <div class="card" id="invoice-card">
+      <div class="section-title">請求書発行</div>
+      <div id="invoice-controls">
+        <div class="period-bar">
+          <select id="inv-type">
+            <option value="10">10日締め（1日〜10日）</option>
+            <option value="20">20日締め（11日〜20日）</option>
+            <option value="31">月末締め（21日〜月末）</option>
+          </select>
+          <select id="inv-year"></select>
+          <select id="inv-month"></select>
+          <button class="btn-load" onclick="buildInvoice()">請求書作成</button>
+        </div>
+      </div>
+      <div id="invoice-container"><div class="empty">締め区分と年月を選択してください</div></div>
+    </div>
+
+  </div>
+
+</div><!-- /content -->
+
+<script>
+// ──────────────────────────────────────────────
+// Supabase設定
+// ──────────────────────────────────────────────
+const SUPABASE_URL = 'https://vvyzwwoduaqqamjvoqrp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2eXp3d29kdWFxcWFtanZvcXJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MTk1MzMsImV4cCI6MjA5NTM5NTUzM30.aKE-ZUjXJ0j3iBMQP1GLpfwwzPWGJFglhJa0vB52Q-U';  // ← index.htmlと同じキーを入れる
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(SUPABASE_URL + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : [];
+}
+
+// ──────────────────────────────────────────────
+// 計算ロジック（index.htmlと同一）
+// ──────────────────────────────────────────────
+function intfloor(v) { return Math.floor(v); }
+function costPrice(D) {
+  if (!D || D <= 0) return null;
+  const num = D * 835, q = Math.floor(num/1000), r = num%1000;
+  if (r > 500) return q+1; if (r < 500) return q;
+  return q%2===0 ? q : q+1;
+}
+function calcD(E) {
+  if (!E || E <= 0) return null;
+  const up = Math.ceil(E/1.1);
+  return (intfloor(up*1.1)===E) ? up : up-1;
+}
+function calcC31(E8, E9, E10) {
+  const E11 = E8+E9+E10;
+  const D9=calcD(E9), D10=calcD(E10), D11=calcD(E11);
+  const C9=D9!==null?costPrice(D9):null, C10=D10!==null?costPrice(D10):null;
+  const gH=(E8>0)&&(intfloor(Math.ceil(E8/1.1)*1.1)!==E8);
+  const cH=(E9>0)&&(intfloor(Math.ceil(E9/1.1)*1.1)!==E9);
+  const qH=(E10>0)&&(intfloor(Math.ceil(E10/1.1)*1.1)!==E10);
+  const tH=D11!==null&&intfloor(D11*1.1)!==E11;
+  const tAdj=((gH||cH||qH)&&tH)?1:0;
+  const has3=E8>0&&E9>0&&E10>0;
+  const showG=gH&&!has3, showC=cH&&!has3, showQ=qH&&!has3;
+  const D31=E11>0?D11+tAdj:null;
+  const C31=D31!==null?costPrice(D31):null;
+  const D31v=D31||0;
+  const D27=E8>0?D31v-(showG?1:0)-(D9||0)-(showC?1:0)-(D10||0)-(showQ?1:0):null;
+  const C27=E8>0?C31-(showG?1:0)-(C9||0)-(showC?1:0)-(C10||0)-(showQ?1:0):null;
+  return { C31, D31, E11, C27, D27, C9, D9, C10, D10 };
+}
+
+// ──────────────────────────────────────────────
+// ユーティリティ
+// ──────────────────────────────────────────────
+function fmt(v) {
+  if (v===null||v===undefined) return '';
+  return Number(v).toLocaleString('ja-JP');
+}
+function fmtDate(s) {
+  if (!s) return '';
+  const d = new Date(s+'T00:00:00');
+  return d.toLocaleDateString('ja-JP', {month:'long', day:'numeric', weekday:'short'});
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ──────────────────────────────────────────────
+// 一覧タブ
+// ──────────────────────────────────────────────
+async function loadList() {
+  const month = document.getElementById('list-month').value;
+  if (!month) { alert('月を選択してください'); return; }
+  const [y, m] = month.split('-');
+  const from = `${y}-${m}-01`;
+  const last = new Date(Number(y), Number(m), 0).getDate();
+  const to   = `${y}-${m}-${String(last).padStart(2,'0')}`;
+  await fetchAndRenderList(`payment_date=gte.${from}&payment_date=lte.${to}`);
+}
+
+async function loadListAll() {
+  await fetchAndRenderList('');
+}
+
+async function fetchAndRenderList(filter) {
+  const el = document.getElementById('list-container');
+  el.innerHTML = '<div class="loading">読み込み中...</div>';
+  try {
+    const q = filter ? `?${filter}&order=payment_date.asc,id.asc` : '?order=payment_date.asc,id.asc';
+    const rows = await sbFetch('/rest/v1/daily_payments' + q);
+    if (!rows.length) { el.innerHTML = '<div class="empty">データがありません</div>'; return; }
+
+    // 最新レコードのみ表示（is_edited=trueは除く）
+    const latest = getLatestRecords(rows);
+
+    el.innerHTML = `
+      <div style="font-size:12px;color:#888;margin-bottom:8px;">${latest.length}件</div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>現金</th>
+            <th>クレジット</th>
+            <th>QR</th>
+            <th>合計</th>
+            <th>原価合計</th>
+            <th>客数</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${latest.map(r => {
+            const E8=r.genkin||0, E9=r.credit||0, E10=r.qr||0;
+            const {C31} = calcC31(E8, E9, E10);
+            return `<tr class="${r.is_correction?'':''}">
+              <td class="c">${fmtDate(r.payment_date)}
+                ${r.is_correction?'<span class="badge badge-correction">修正</span>':''}
+              </td>
+              <td>${E8>0?fmt(E8):'—'}</td>
+              <td>${E9>0?fmt(E9):'—'}</td>
+              <td>${E10>0?fmt(E10):'—'}</td>
+              <td><b>${fmt(E8+E9+E10)}</b></td>
+              <td>${fmt(C31)}</td>
+              <td class="c">${r.customer_count!==null?r.customer_count+'名':'—'}</td>
+              <td class="c"><button class="btn-small btn-edit" onclick="openModal(${r.id},'${r.payment_date}',${E8},${E9},${E10},${r.customer_count||0},${r.slip_number||0})">修正</button></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="empty">エラー: ${e.message}</div>`;
+  }
+}
+
+// 同じ日付で複数レコードがある場合、最新（最大id）のみ表示
+function getLatestRecords(rows) {
+  const map = {};
+  rows.forEach(r => {
+    if (r.is_edited) return; // 旧データはスキップ
+    const key = r.payment_date;
+    if (!map[key] || r.id > map[key].id) map[key] = r;
+  });
+  return Object.values(map).sort((a,b) => a.payment_date.localeCompare(b.payment_date));
+}
+
+// ──────────────────────────────────────────────
+// 締め集計タブ
+// ──────────────────────────────────────────────
+function getShimePeriod(type, year, month) {
+  const y = Number(year), m = Number(month);
+  const mm = String(m).padStart(2,'0');
+  if (type === '10') {
+    return {
+      from: `${y}-${mm}-01`,
+      to:   `${y}-${mm}-10`,
+      label: `${y}年${m}月1日 〜 ${y}年${m}月10日`
+    };
+  } else if (type === '20') {
+    return {
+      from: `${y}-${mm}-11`,
+      to:   `${y}-${mm}-20`,
+      label: `${y}年${m}月11日 〜 ${y}年${m}月20日`
+    };
+  } else {
+    const last = new Date(y, m, 0).getDate();
+    return {
+      from: `${y}-${mm}-21`,
+      to:   `${y}-${mm}-${last}`,
+      label: `${y}年${m}月21日 〜 ${y}年${m}月${last}日`
+    };
+  }
+}
+
+async function loadShime() {
+  const type  = document.getElementById('shime-type').value;
+  const year  = document.getElementById('shime-year').value;
+  const month = document.getElementById('shime-month').value;
+  const { from, to, label } = getShimePeriod(type, year, month);
+
+  document.getElementById('shime-period-label').innerHTML =
+    `<div class="period-label">📅 ${label}</div>`;
+
+  const el = document.getElementById('shime-container');
+  el.innerHTML = '<div class="loading">集計中...</div>';
+
+  try {
+    const rows = await sbFetch(
+      `/rest/v1/daily_payments?payment_date=gte.${from}&payment_date=lte.${to}&order=payment_date.asc,id.asc`
+    );
+    const latest = getLatestRecords(rows);
+
+    if (!latest.length) { el.innerHTML = '<div class="empty">この期間のデータがありません</div>'; return; }
+
+    // 集計
+    let totalGenkin=0, totalCredit=0, totalQr=0, totalSale=0, totalCost=0, totalCust=0, custDays=0;
+    latest.forEach(r => {
+      const E8=r.genkin||0, E9=r.credit||0, E10=r.qr||0;
+      const {C31} = calcC31(E8, E9, E10);
+      totalGenkin += E8; totalCredit += E9; totalQr += E10;
+      totalSale += E8+E9+E10;
+      totalCost += C31||0;
+      if (r.customer_count) { totalCust += r.customer_count; custDays++; }
+    });
+    const avgSale = custDays > 0 ? Math.round(totalSale / totalCust) : null;
+
+    el.innerHTML = `
+      <div class="summary-grid">
+        <div class="summary-box highlight">
+          <div class="s-label">売上合計（税込）</div>
+          <div class="s-value">${fmt(totalSale)}</div>
+          <div class="s-sub">円</div>
+        </div>
+        <div class="summary-box highlight">
+          <div class="s-label">原価合計</div>
+          <div class="s-value">${fmt(totalCost)}</div>
+          <div class="s-sub">円</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">現金</div>
+          <div class="s-value">${fmt(totalGenkin)}</div>
+          <div class="s-sub">円</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">クレジット</div>
+          <div class="s-value">${fmt(totalCredit)}</div>
+          <div class="s-sub">円</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">QR（PayPay）</div>
+          <div class="s-value">${fmt(totalQr)}</div>
+          <div class="s-sub">円</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">営業日数</div>
+          <div class="s-value">${latest.length}</div>
+          <div class="s-sub">日</div>
+        </div>
+        ${totalCust>0 ? `
+        <div class="summary-box">
+          <div class="s-label">総客数</div>
+          <div class="s-value">${fmt(totalCust)}</div>
+          <div class="s-sub">名</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">客単価（平均）</div>
+          <div class="s-value">${fmt(avgSale)}</div>
+          <div class="s-sub">円</div>
+        </div>` : ''}
+      </div>
+
+      <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>現金</th>
+            <th>クレジット</th>
+            <th>QR</th>
+            <th>合計</th>
+            <th>原価合計</th>
+            <th>客数</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${latest.map(r => {
+            const E8=r.genkin||0, E9=r.credit||0, E10=r.qr||0;
+            const {C31} = calcC31(E8, E9, E10);
+            return `<tr>
+              <td class="c">${fmtDate(r.payment_date)}
+                ${r.is_correction?'<span class="badge badge-correction">修正</span>':''}
+              </td>
+              <td>${E8>0?fmt(E8):'—'}</td>
+              <td>${E9>0?fmt(E9):'—'}</td>
+              <td>${E10>0?fmt(E10):'—'}</td>
+              <td><b>${fmt(E8+E9+E10)}</b></td>
+              <td>${fmt(C31)}</td>
+              <td class="c">${r.customer_count!==null?r.customer_count+'名':'—'}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:#1a2e4a;color:#fff;font-weight:bold;">
+            <td class="c" style="color:#fff">合計</td>
+            <td style="color:#fff">${fmt(totalGenkin)}</td>
+            <td style="color:#fff">${fmt(totalCredit)}</td>
+            <td style="color:#fff">${fmt(totalQr)}</td>
+            <td style="color:#fff">${fmt(totalSale)}</td>
+            <td style="color:#fff">${fmt(totalCost)}</td>
+            <td style="color:#fff">${totalCust>0?totalCust+'名':'—'}</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="empty">エラー: ${e.message}</div>`;
+  }
+}
+
+// ──────────────────────────────────────────────
+// 修正モーダル
+// ──────────────────────────────────────────────
+let editingId = null;
+
+function openModal(id, date, genkin, credit, qr, customers, slip) {
+  editingId = id;
+  document.getElementById('modal-date').value     = date;
+  document.getElementById('modal-genkin').value   = genkin || '';
+  document.getElementById('modal-credit').value   = credit || '';
+  document.getElementById('modal-qr').value       = qr || '';
+  document.getElementById('modal-slip').value     = slip || '';
+  document.getElementById('modal-customers').value= customers || '';
+  document.getElementById('modal-error').style.display = 'none';
+  document.getElementById('modal-original').innerHTML =
+    `修正前: <span>${fmtDate(date)}</span> ／ 現金 <span>${fmt(genkin)}</span> ／ クレジット <span>${fmt(credit)}</span> ／ QR <span>${fmt(qr)}</span>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+  editingId = null;
+}
+
+async function saveEdit() {
+  const errEl = document.getElementById('modal-error');
+  errEl.style.display = 'none';
+
+  const payment_date = document.getElementById('modal-date').value;
+  const genkin    = Number(document.getElementById('modal-genkin').value)   || 0;
+  const credit    = Number(document.getElementById('modal-credit').value)   || 0;
+  const qr        = Number(document.getElementById('modal-qr').value)       || 0;
+  const slip      = document.getElementById('modal-slip').value;
+  const customers = document.getElementById('modal-customers').value;
+
+  if (!payment_date) { errEl.textContent='日付を入力してください'; errEl.style.display='block'; return; }
+  if (genkin+credit+qr === 0) { errEl.textContent='金額を入力してください'; errEl.style.display='block'; return; }
+
+  const btn = document.querySelector('.btn-save-edit');
+  btn.disabled = true;
+
+  try {
+    // 旧レコードに is_edited=true を付ける
+    await sbFetch(`/rest/v1/daily_payments?id=eq.${editingId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_edited: true })
+    });
+
+    // 新レコードを追加（is_correction=true, original_idを記録）
+    await sbFetch('/rest/v1/daily_payments', {
+      method: 'POST',
+      body: JSON.stringify({
+        payment_date,
+        genkin,
+        credit,
+        qr,
+        slip_number: slip ? Number(slip) : null,
+        customer_count: customers ? Number(customers) : null,
+        is_correction: true,
+        original_id: editingId,
+        source_type: 'manual'
+      })
+    });
+
+    closeModal();
+    // 現在表示中のタブを再読み込み
+    const activeTab = document.querySelector('.tab.active').textContent;
+    if (activeTab.includes('一覧')) {
+      loadList().catch(() => loadListAll());
+    } else {
+      loadShime();
+    }
+  } catch(e) {
+    errEl.textContent = '保存に失敗しました: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ──────────────────────────────────────────────
+// ──────────────────────────────────────────────
+// 請求書生成
+// ──────────────────────────────────────────────
+async function buildInvoice() {
+  const type  = document.getElementById('inv-type').value;
+  const year  = document.getElementById('inv-year').value;
+  const month = document.getElementById('inv-month').value;
+  const { from, to, label } = getShimePeriod(type, year, month);
+
+  const el = document.getElementById('invoice-container');
+  el.innerHTML = '<div class="loading">請求書を生成中...</div>';
+
+  try {
+    const rows = await sbFetch(
+      `/rest/v1/daily_payments?payment_date=gte.${from}&payment_date=lte.${to}&order=payment_date.asc,id.asc`
+    );
+    const latest = getLatestRecords(rows);
+    if (!latest.length) { el.innerHTML = '<div class="empty">この期間のデータがありません</div>'; return; }
+
+    // 明細行を生成（支払区分別）
+    const detailRows = [];
+    latest.forEach(r => {
+      const E8=r.genkin||0, E9=r.credit||0, E10=r.qr||0;
+      const {C27,D27,C9,D9,C10,D10} = calcC31(E8,E9,E10);
+      const slip = r.slip_number || '—';
+      const dateStr = fmtDateShort(r.payment_date);
+      if (E8>0)  detailRows.push({date:dateStr, slip, d:D27, c:C27, label:'現金分'});
+      if (E9>0)  detailRows.push({date:dateStr, slip, d:D9,  c:C9,  label:'クレジット支払分'});
+      if (E10>0) detailRows.push({date:dateStr, slip, d:D10, c:C10, label:'PayPay支払分'});
+    });
+
+    // 合計
+    const totalD = detailRows.reduce((s,r) => s+(r.d||0), 0);
+    const totalC = detailRows.reduce((s,r) => s+(r.c||0), 0);
+    const tax    = Math.round(totalC * 0.1);  // 四捨五入
+    const grand  = totalC + tax;
+
+    // キャッシュレス合計（月末締めのみ表示）
+    const isMonthEnd = type === '31';
+    let cashlessCreditD = 0, cashlessQrD = 0;
+    if (isMonthEnd) {
+      // 月全体（1〜末日）のキャッシュレスを集計
+      const mm = String(Number(month)).padStart(2,'0');
+      const lastDay = new Date(Number(year), Number(month), 0).getDate();
+      const allRows = await sbFetch(
+        `/rest/v1/daily_payments?payment_date=gte.${year}-${mm}-01&payment_date=lte.${year}-${mm}-${lastDay}&order=payment_date.asc,id.asc`
+      );
+      const allLatest = getLatestRecords(allRows);
+      allLatest.forEach(r => {
+        const E9=r.credit||0, E10=r.qr||0;
+        const {C9,D9,C10,D10} = calcC31(0,E9,E10);
+        cashlessCreditD += D9||0;
+        cashlessQrD     += D10||0;
+      });
+    }
+
+    // 発行日
+    const today = new Date();
+    const issueDate = today.toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric'});
+
+    // レンダリング
+    const y = year, m = Number(month);
+    el.innerHTML = `
+      <div id="invoice-controls-top" style="margin-bottom:12px;">
+        <button class="btn-print" onclick="window.print()">🖨 印刷 / PDF保存</button>
+      </div>
+      <div class="invoice-wrap" id="inv-doc">
+        <div class="inv-title">合　計　請　求　書</div>
+        <div class="inv-meta">
+          <div class="left">
+            <div style="font-size:15px;font-weight:bold;">株式会社 主婦の店 鶴岡店　御中</div>
+            <div>〒997-0857</div>
+            <div>山形県鶴岡市美咲町３７−１７</div>
+            <div>TEL: 0235-22-2683</div>
+            <div style="margin-top:8px;" class="inv-tenant">主婦の店パル店テナント分</div>
+          </div>
+          <div class="right">
+            <div>発行日：${issueDate}</div>
+            <div style="margin-top:4px;">株式会社ファンシーフラワー</div>
+            <div>〒997-0029</div>
+            <div>山形県鶴岡市日吉町２－２３</div>
+            <div>TEL: 0235-24-1412</div>
+            <div>FAX: 0235-24-6614</div>
+            <div>登録番号：T9-3900-0100-7773</div>
+          </div>
+        </div>
+
+        <div class="inv-period">請求期間：${label}</div>
+
+        <div class="inv-amount-box">
+          <div class="lbl">御　請　求　金　額（税込）</div>
+          <div class="val">¥ ${fmtDec(grand)}</div>
+        </div>
+
+        <table class="inv-table">
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>日付</th>
+              <th>伝票番号</th>
+              <th>売単価（税抜）</th>
+              <th>原単価（税抜）</th>
+              <th>税率</th>
+              <th>備考（支払区分）</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detailRows.map((r,i) => `<tr>
+              <td class="c">${i+1}</td>
+              <td class="c">${r.date}</td>
+              <td class="c">${r.slip}</td>
+              <td>${fmt(r.d)}</td>
+              <td>${fmt(r.c)}</td>
+              <td class="c">10%</td>
+              <td class="l">${r.label}</td>
+            </tr>`).join('')}
+            <tr class="subtotal">
+              <td colspan="3" class="l">小計</td>
+              <td>${fmt(totalD)}</td>
+              <td>${fmt(totalC)}</td>
+              <td></td><td></td>
+            </tr>
+            <tr class="subtotal">
+              <td colspan="3" class="l">消費税10%</td>
+              <td></td>
+              <td>${fmtDec(tax)}</td>
+              <td></td><td></td>
+            </tr>
+            <tr class="total-row">
+              <td colspan="3" class="l">総　計</td>
+              <td></td>
+              <td>${fmtDec(grand)}</td>
+              <td></td><td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        ${isMonthEnd ? `
+        <div class="inv-cashless">
+          <div style="font-weight:bold;margin-bottom:6px;">【月間キャッシュレス合計】（全月分・合計請求書添付用）</div>
+          <table>
+            <tr><td>PayPay支払分合計</td><td class="r">${fmt(cashlessQrD)}</td></tr>
+            <tr><td>クレジット支払分合計</td><td class="r">${fmt(cashlessCreditD)}</td></tr>
+            <tr><td style="font-weight:bold;">キャッシュレス分総計</td><td class="r" style="font-weight:bold;">${fmt(cashlessCreditD+cashlessQrD)}</td></tr>
+          </table>
+        </div>` : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="empty">エラー: ${e.message}</div>`;
+  }
+}
+
+function fmtDateShort(s) {
+  if (!s) return '';
+  const d = new Date(s+'T00:00:00');
+  return d.toLocaleDateString('ja-JP', {month:'numeric', day:'numeric'});
+}
+
+function fmtDec(v) {
+  if (v === null || v === undefined) return '';
+  // 小数がある場合はそのまま、ない場合は整数表示
+  return Number(v) % 1 === 0
+    ? Number(v).toLocaleString('ja-JP')
+    : Number(v).toLocaleString('ja-JP', {minimumFractionDigits:1, maximumFractionDigits:1});
+}
+
+// ──────────────────────────────────────────────
+// 初期化
+// ──────────────────────────────────────────────
+function init() {
+  // 今月をデフォルト
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth() + 1;
+  document.getElementById('list-month').value = `${y}-${String(m).padStart(2,'0')}`;
+
+  // 年月セレクタ（締め集計・請求書共通）
+  ['shime-year','inv-year'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let i = y; i >= y-2; i--) {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = i + '年';
+      sel.appendChild(opt);
+    }
+  });
+  ['shime-month','inv-month'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let i = 1; i <= 12; i++) {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = i + '月';
+      if (i === m) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
